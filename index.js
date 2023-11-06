@@ -35,9 +35,17 @@ async function run() {
          res.send(result)
     })
 
+    app.get('/availablefoods',async(req,res)=>{
+        const result=await foodCollection.find().toArray()
+        res.send(result)
+    })
 
-
-
+    app.get('/availablefoods/sorted',async(req,res)=>{
+        const query={}
+        const options={sort:{expireDate:1 }}
+        const result=await foodCollection.find(query,options).toArray()
+        res.send(result)
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
