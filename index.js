@@ -3,7 +3,7 @@ const cors=require("cors")
 require('dotenv').config()
 const app =express()
 const port=process.env.PORT ||5000
-
+const { ObjectId } = require('mongodb');
 
 app.use(cors())
 app.use(express.json())
@@ -27,14 +27,14 @@ async function run() {
     await client.connect();
     
     const foodCollection= client.db("donateFood").collection('foods')
-
+    const requestfoodCollection=client.db('donateFood').collection('request')
 
     app.post('/addfood',async(req,res)=>{
          const food=req.body
          const result=await foodCollection.insertOne(food)
          res.send(result)
     })
-
+    
     app.get('/availablefoods',async(req,res)=>{
         const result=await foodCollection.find().toArray()
         res.send(result)
@@ -45,6 +45,20 @@ async function run() {
         const options={sort:{expireDate:1 }}
         const result=await foodCollection.find(query,options).toArray()
         res.send(result)
+    })
+
+    app.get("/singleFoodDetail/:id",async(req,res)=>{
+        const id=req.params.id 
+        const query={_id: new ObjectId(id)}
+        const result=await foodCollection.findOne(query)
+        res.send(result)
+    })
+
+
+    app.post('/requestfood',async(req,res)=>{
+      const food=req.body;
+      const result=await requestfoodCollection.insertOne(food)
+      res.send(result)
     })
 
     // Send a ping to confirm a successful connection
