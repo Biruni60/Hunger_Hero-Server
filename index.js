@@ -46,6 +46,13 @@ async function run() {
         const result=await foodCollection.find(query,options).toArray()
         res.send(result)
     })
+    app.get('/availablefoods/sorted2',async(req,res)=>{
+        const query={}
+        const options={sort:{quantity:-1 }}
+        const result=await foodCollection.find(query,options).toArray()
+        res.send(result)
+    })
+    
 
     app.get("/singleFoodDetail/:id",async(req,res)=>{
         const id=req.params.id 
@@ -58,6 +65,12 @@ async function run() {
     app.post('/requestfood',async(req,res)=>{
       const food=req.body;
       const result=await requestfoodCollection.insertOne(food)
+      res.send(result)
+    })
+
+
+    app.get('/requestfood',async(req,res)=>{
+      const result=await requestfoodCollection.find().toArray()
       res.send(result)
     })
 
