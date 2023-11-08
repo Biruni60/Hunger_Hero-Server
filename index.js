@@ -85,11 +85,31 @@ async function run() {
       const result=await requestfoodCollection.find().toArray()
       res.send(result)
     })
+    
+    app.put('/updatefood/:id',async(req,res)=>{
+      const id=req.params.id;
+      const food=req.body
+      const updateFood={
+        $set:{
+         name:food.name,
+         image:food.image,
+         quantity:food.quantity,
+         location:food.location,
+         expireDate:food.expireDate,
+         note:food.note
+        }
+      }
+      const query={_id:new ObjectId(id)}
+      const result=await foodCollection.updateOne(query,updateFood)
+      res.send(result)
+    })
+
+
     app.delete('/delete/:id',async(req,res)=>{
       const id=req.params.id;
       const query={_id:new ObjectId(id)}
       const result=await foodCollection.deleteOne(query)
-      res.send()
+      res.send(result)
     })
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
