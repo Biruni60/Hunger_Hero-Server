@@ -1,12 +1,25 @@
 const express=require("express")
 const cors=require("cors")
+const jwt = require('jsonwebtoken')
+cookieParser = require('cookie-parser')
 require('dotenv').config()
 const app =express()
 const port=process.env.PORT ||5000
 const { ObjectId } = require('mongodb');
 
-app.use(cors())
+app.use(cors({
+  origin:[
+  "https://donate-now-7ccde.web.app",
+  "https://donate-now-7ccde.firebaseapp.com/",
+  "http://localhost:5173"
+  ],
+  credentials:true
+}));
+app.use(cookieParser())
 app.use(express.json())
+
+
+
 
 
 const { MongoClient, ServerApiVersion } = require('mongodb');
@@ -21,15 +34,54 @@ const client = new MongoClient(uri, {
   }
 });
 
+
+const logger =(req,res,next)=>{
+  console.log('log:info',req.method,req.url);
+  next();
+}
+
+const verifyToken=(req,res,next)=>{
+  const token=req?.cookies?.token
+  if(!token){
+    return res.status(401).send({message:"unauthorized access"})
+  }
+  jwt.verify(token,process.env.ACCESS_TOKEN,(err,decoded)=>{
+    if(err){
+      return res.status(401).send({message:"unauthorized"})
+    }
+    req.user=decoded;
+    next()
+  })
+}
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     
     const foodCollection= client.db("donateFood").collection('foods')
     const requestfoodCollection=client.db('donateFood').collection('request')
+    
 
-    app.post('/addfood',async(req,res)=>{
+    app.post("/jwt",async(req,res)=>{
+   const user=req.body;
+   const token=jwt.sign(user,process.env.ACCESS_TOKEN,{expiresIn:'1h'})
+   res.cookie('token',token,{
+    httpOnly:true,
+    secure:true,
+    sameSite:'none'
+   }).send({success:true});
+    })
+
+    app.post('/logout',(req,res)=>{
+      const user=req.body;
+      console.log("loggingOut",user);
+      res.clearCookie('token',{maxAge:0}).send('success')
+   })
+
+
+
+    app.post('/addfood',logger,verifyToken,async(req,res)=>{
          const food=req.body
          const result=await foodCollection.insertOne(food)
          res.send(result)
@@ -48,21 +100,31 @@ async function run() {
     })
     app.get('/availablefoods/sorted2',async(req,res)=>{
         const query={}
-        const options={sort:{quantity:-1 }}
+        const options={sort:{quantity:-1}}
         const result=await foodCollection.find(query,options).toArray()
         res.send(result)
     })
     
-    app.get("/managefoods",async(req,res)=>{
+    app.get("/managefoods",logger,verifyToken,async(req,res)=>{
+      const userEmail=req.query.email
+      let query={}
+      
+      if(!req.query.email){
+        return
+      }
+      query={email:userEmail}
+      const result=await foodCollection.find(query).toArray()
+      res.send(result)
+    })
+    app.get("/requestfoods",logger,verifyToken,async(req,res)=>{
       const userEmail=req.query.email
       let query={}
       console.log(userEmail);
-      if(req.query?.email){
-         query={email:userEmail}
-        
+      if(!req.query.email){
+        return
       }
-   
-      const result=await foodCollection.find(query).toArray()
+      query={requestEmail:userEmail}
+      const result=await requestfoodCollection.find(query).toArray()
       res.send(result)
     })
 
@@ -85,7 +147,30 @@ async function run() {
       const result=await requestfoodCollection.find().toArray()
       res.send(result)
     })
+    app.get("/manage/:id",async(req,res)=>{
+      const uid=req.params.id 
+      console.log(uid);
+      const query={_id:uid}
+      console.log(query);
+      const result=await requestfoodCollection.findOne(query)
+      res.send(result)
+    })
     
+
+    app.put('/status/:id',async(req,res)=>{
+       const id=req.params.id 
+       const query={_id:id}
+       const value="Delivered"
+       const updateStatus={
+        $set:{
+        status:value
+        }
+       }
+       const result=await requestfoodCollection.updateOne(query,updateStatus)
+      res.send(result)
+    })
+
+
     app.put('/updatefood/:id',async(req,res)=>{
       const id=req.params.id;
       const food=req.body
@@ -111,6 +196,13 @@ async function run() {
       const result=await foodCollection.deleteOne(query)
       res.send(result)
     })
+    app.delete('/cancel/:id',async(req,res)=>{
+      const id=req.params.id;
+      const query={_id:id}
+      const result=await requestfoodCollection.deleteOne(query)
+      res.send(result)
+    })
+   
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
